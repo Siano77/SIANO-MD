@@ -5,7 +5,7 @@ function prefix() {
 }
 
 function owner()  { 
-    return process.env.OWNER_NUMBER || '' 
+    return process.env.OWNER_NUMBER || '2348100000000' 
 }
 
 function botName(){ 
