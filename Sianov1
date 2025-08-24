@@ -1,0 +1,2 @@
+mkdir md-bot && cd md-bot
+npm init -y
