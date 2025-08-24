@@ -1,7 +1,7 @@
-require("dotenv").config();
+require('dotenv').config()
 
-module.exports = {
-  PREFIX: "#",
-  BOT_NAME: process.env.BOT_NAME || "MD Bot",
-  OWNER_NUMBER: process.env.OWNER_NUMBER || "1234567890@s.whatsapp.net",
-};
+function prefix() { return process.env.PREFIX || '#' }
+function owner()  { return process.env.OWNER_NUMBER || '' }
+function botName(){ return process.env.BOT_NAME || 'SIANO-MD' }
+
+module.exports = { prefix, owner, botName }
