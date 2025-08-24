@@ -244,3 +244,96 @@ module.exports = {
     return { image: { url: data.message }, caption: '🐶 Woof!' }
   }
 }
+const { downloadMediaMessage } = require('@whiskeysockets/baileys')
+const yts = require('yt-search')
+const ytdl = require('ytdl-core')
+
+module.exports = {
+  // image → sticker
+  sticker: async ({ sock, msg }) => {
+    if (!msg.message?.imageMessage) return 'Reply to an *image* with #sticker'
+    const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: sock.logger, reuploadRequest: sock.updateMediaMessage })
+    return { sticker: buffer }
+  },
+
+  // search & reply with top video link
+  play: async ({ args }) => {
+    const q = args.join(' ')
+    if (!q) return 'Usage: #play <song>'
+    const res = await yts(q)
+    const v = res.videos?.[0]
+    if (!v) return '❌ No results found.'
+    return `🎵 *${v.title}*\n⏱️ ${v.timestamp}\n👤 ${v.author.name}\n🔗 ${v.url}`
+  },
+
+  // YouTube → audio (m4a/mp4a)
+  ytmp3: async ({ args }) => {
+    const url = args[0]
+    if (!url || !ytdl.validateURL(url)) return 'Usage: #ytmp3 <youtube-url>'
+    const info = await ytdl.getInfo(url)
+    const format = ytdl.chooseFormat(info.formats, { quality: '140' }) || ytdl.chooseFormat(info.formats, { filter: 'audioonly' })
+    const chunks = []
+    return await new Promise((resolve, reject) => {
+      ytdl.downloadFromInfo(info, { format })
+        .on('data', c => chunks.push(c))
+        .on('end', () => resolve({ audio: Buffer.concat(chunks), mimetype: 'audio/mp4', ptt: false, fileName: (info.videoDetails.title || 'audio') + '.m4a' }))
+        .on('error', err => resolve('❌ Download failed.'))
+    })
+  },
+
+  // YouTube → video (mp4 itag 18 when possible)
+  ytmp4: async ({ args }) => {
+    const url = args[0]
+    if (!url || !ytdl.validateURL(url)) return 'Usage: #ytmp4 <youtube-url>'
+    const info = await ytdl.getInfo(url)
+    const format = ytdl.chooseFormat(info.formats, { quality: '18' }) || ytdl.chooseFormat(info.formats, { filter: f => f.container === 'mp4' && f.hasVideo })
+    const chunks = []
+    return await new Promise((resolve, reject) => {
+      ytdl.downloadFromInfo(info, { format })
+        .on('data', c => chunks.push(c))
+        .on('end', () => resolve({ video: Buffer.concat(chunks), mimetype: 'video/mp4', fileName: (info.videoDetails.title || 'video') + '.mp4' }))
+        .on('error', err => resolve('❌ Download failed.'))
+    })
+  }
+}
+const { setGlobal, getGlobal, setGroupSetting } = require('../utils/store')
+
+async function requireGroup(msg) { return msg.key.remoteJid.endsWith('@g.us') }
+
+module.exports = {
+  kick: async ({ sock, msg, args }) => {
+    const inGroup = await requireGroup(msg); if (!inGroup) return 'Group only.'
+    const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0]
+    if (!mentioned && !args[0]) return 'Tag a user or provide number.'
+    const target = mentioned || (args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net')
+    await sock.groupParticipantsUpdate(msg.key.remoteJid, [target], 'remove')
+    return `👢 Kicked @${target.split('@')[0]}`
+  },
+  add: async ({ sock, msg, args }) => {
+    const inGroup = await requireGroup(msg); if (!inGroup) return 'Group only.'
+    if (!args[0]) return 'Usage: #add <number>'
+    const target = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net'
+    await sock.groupParticipantsUpdate(msg.key.remoteJid, [target], 'add')
+    return `➕ Invited ${args[0]}`
+  },
+  promote: async ({ sock, msg, args }) => {
+    const inGroup = await requireGroup(msg); if (!inGroup) return 'Group only.'
+    const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0]
+    if (!mentioned && !args[0]) return 'Tag a user or provide number.'
+    const target = mentioned || (args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net')
+    await sock.groupParticipantsUpdate(msg.key.remoteJid, [target], 'promote')
+    return `👑 Promoted @${target.split('@')[0]}`
+  },
+  demote: async ({ sock, msg, args }) => {
+    const inGroup = await requireGroup(msg); if (!inGroup) return 'Group only.'
+    const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0]
+    if (!mentioned && !args[0]) return 'Tag a user or provide number.'
+    const target = mentioned || (args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net')
+    await sock.groupParticipantsUpdate(msg.key.remoteJid, [target], 'demote')
+    return `⬇️ Demoted @${target.split('@')[0]}`
+  },
+  mute: async ({ sock, msg }) => { await sock.groupSettingUpdate(msg.key.remoteJid, 'announcement'); return '🔒 Group muted (admins only)' },
+  unmute: async ({ sock, msg }) => { await sock.groupSettingUpdate(msg.key.remoteJid, 'not_announcement'); return '🔓 Group unmuted (everyone can send)' },
+  antilink: async ({ msg, args }) => { const onoff = (args[0]||'').toLowerCase(); if(!['on','off'].includes(onoff)) return 'Usage: #antilink on|off'; setGroupSetting(msg.key.remoteJid,'antilink', onoff==='on'); return `🔗 Anti‑link ${onoff==='on'?'enabled':'disabled'}` },
+  antispam: async ({ args }) => { const onoff = (args[0]||'').toLowerCase(); if(!['on','off'].includes(onoff)) return 'Usage: #antispam on|off'; setGlobal('antispam', onoff==='on'); return `⚡ Anti‑spam ${onoff==='on'?'enabled':'disabled'}` }
+}
