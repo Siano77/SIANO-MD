@@ -20,3 +20,34 @@ module.exports = {
     }, { quoted: m });
   },
 };
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+
+module.exports = {
+  // existing commands like sticker, play, ytmp3, ytmp4 ...
+
+  // --- New commands ---
+
+  viewonce: async ({ sock, msg }) => {
+    if (!msg.message?.imageMessage && !msg.message?.videoMessage) {
+      return 'Reply to a *view-once* image or video with #viewonce';
+    }
+
+    // Clone the original message and remove viewOnce flag
+    const type = Object.keys(msg.message).find(k => k.endsWith('Message'));
+    const original = msg.message[type];
+    original.viewOnce = false;
+
+    // Download media
+    const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: sock.logger, reuploadRequest: sock.updateMediaMessage });
+
+    return { [type.replace('Message','')]: buffer };
+  },
+
+  mode: async ({ args }) => {
+    // Example: a simple bot mode switch
+    const mode = (args[0] || '').toLowerCase();
+    if (!['normal','silent','fun'].includes(mode)) return 'Usage: #mode <normal|silent|fun>';
+    // You can store this mode in a global variable or db
+    return `✅ Bot mode set to *${mode}*`;
+  }
+};
