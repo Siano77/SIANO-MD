@@ -1,0 +1,32 @@
+name: Deploy WhatsApp Bot
+
+on:
+  push:
+    branches:
+      - main  # or your deployment branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20  # make sure it matches your bot requirements
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set environment variables
+        run: |
+          echo "PREFIX=#" >> $GITHUB_ENV
+          echo "OWNER_NUMBER=${{ secrets.OWNER_NUMBER }}" >> $GITHUB_ENV
+          echo "BOT_NAME=SIANO-MD" >> $GITHUB_ENV
+
+      - name: Deploy bot
+        run: |
+          npm start
