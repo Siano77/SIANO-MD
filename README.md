@@ -22,8 +22,7 @@ flyctl auth login
 
 Step 2 — Clone & Prepare Repo
 
-git clone https://github.com/Siano77/siano-md-whatsapp-bot.git
-cd md-whatsapp-bot
+git clone https://github.com/Siano77/SIANO-MD.git
 
 # Install dependencies
 npm install
@@ -101,7 +100,7 @@ Fly.io will keep it running 24/7
 
 MD WhatsApp Bot — Modular Deployment-Ready
 
-[![Deploy to Fly.io](https://deploy.fly.io/button.svg)](https://fly.io/apps/new?repo=https://github.com/Siano77/siano-md-whatsapp-bot)
+[![Deploy to Fly.io](https://deploy.fly.io/button.svg)](https://fly.io/apps/new?repo=https://github.com/Siano77/SIANO-MD.git)
 
 A fully modular WhatsApp bot built with **Baileys + Node.js**, ready for **local deployment** or **cloud hosting**.  
 
