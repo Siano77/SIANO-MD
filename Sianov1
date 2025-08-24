@@ -352,3 +352,12 @@ module.exports = {
     return '✅ Custom welcome message saved.'
   }
 }
+git init
+git add .
+git commit -m "MD Bot: initial commit"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/md-bot.git
+git push -u origin main
+npm install
+cp .env.example .env  # edit values
+npm start             # scan QR
