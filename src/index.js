@@ -1,57 +1,54 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@adiwajshing/baileys');
-const { Boom } = require('@hapi/boom');
-const pino = require('pino');
-const fs = require('fs');
-const path = require('path');
-const handler = require('./handler');
-const { loadConfig } = require('./utils/config');
-const { loadStore, saveStore } = require('./utils/store');
+require('dotenv').config()
+const pino = require('pino')
+const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, downloadMediaMessage } = require('@whiskeysockets/baileys')
+const handleMessage = require('./handler')
+const { getGroupSettings, ensureStore } = require('./utils/store')
+const { handleAntiLinkOnMessage } = require('./utils/moderation')
 
-// 📦 Load Config
-const config = loadConfig();
+const logger = pino({ level: 'info' })
 
-// 🗄️ Load auth state
-async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+async function start() {
+  // Ensure persistent storage
+  ensureStore()
+
+  const { state, saveCreds } = await useMultiFileAuthState('session')
+  const { version } = await fetchLatestBaileysVersion()
+
   const sock = makeWASocket({
-    logger: pino({ level: 'silent' }),
-    printQRInTerminal: true,
+    version,
+    logger,
     auth: state,
-  });
+    printQRInTerminal: true
+  })
 
-  // 📂 Load Commands dynamically
-  sock.commands = new Map();
-  const commandsPath = path.join(__dirname, 'commands');
-  fs.readdirSync(commandsPath).forEach(file => {
-    const command = require(path.join(commandsPath, file));
-    sock.commands.set(command.name, command);
-  });
+  // Save credentials automatically
+  sock.ev.on('creds.update', saveCreds)
 
-  // 🎧 Event listeners
+  // Main message pipeline
   sock.ev.on('messages.upsert', async ({ messages }) => {
-    const m = messages[0];
-    if (!m.message) return;
-    await handler(sock, m, config);
-  });
+    const m = messages[0]
+    if (!m || !m.message) return
 
-  // 🔐 Save session
-  sock.ev.on('creds.update', saveCreds);
+    // Anti-link moderation
+    try { await handleAntiLinkOnMessage(sock, m) } catch (e) { logger.warn({ e }, 'Anti-link check failed') }
 
-  // 📦 Store session for persistence
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === 'close') {
-      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      if (reason === DisconnectReason.loggedOut) {
-        console.log('❌ Logged out. Delete auth_info and restart.');
-      } else {
-        console.log('🔄 Reconnecting...');
-        startBot();
-      }
-    } else if (connection === 'open') {
-      console.log(`✅ ${config.BOT_NAME} is online as ${sock.user.id}`);
-    }
-  });
+    // Command handling
+    try { await handleMessage(sock, m) } catch (e) { logger.error({ e }, 'Handler failed') }
+  })
+
+  // Welcome messages
+  sock.ev.on('group-participants.update', async (update) => {
+    try {
+      const chat = update.id
+      const settings = getGroupSettings(chat)
+      if (!settings.welcome || update.action !== 'add') return
+      const user = update.participants[0]
+      const text = (settings.welcomeText || 'Welcome to the group, @user 🎉')
+        .replace(/@user/g, `@${user.split('@')[0]}`)
+      await sock.sendMessage(chat, { text, mentions: [user] })
+    } catch (e) { logger.warn({ e }, 'Welcome failed') }
+  })
 }
 
-startBot();
+// Start bot
+start()
