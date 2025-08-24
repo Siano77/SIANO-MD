@@ -43,3 +43,10 @@ md-bot/
     "yt-search": "^2.10.6"
   }
 }
+node_modules
+.env
+session/
+data/
+PREFIX=#
+OWNER_NUMBER=2347043387336
+BOT_NAME=SIANO-MD
