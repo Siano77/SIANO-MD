@@ -3,8 +3,10 @@ const { prefix, botName } = require('../utils/config')
 module.exports = {
   help: async () => {
     const p = prefix()
+    const name = botName()
+
     return [
-      `🤖 *${botName()}* — Commands`,
+      `🤖 *${name}* — Commands`,
       '',
       '🎮 *Fun*',
       `${p}dice, ${p}coin, ${p}rps <rock|paper|scissors>, ${p}meme, ${p}cat, ${p}dog`,
@@ -14,7 +16,7 @@ module.exports = {
       '',
       '👑 *Admin*',
       `${p}kick <@user>, ${p}add <number>, ${p}promote <@user>, ${p}demote <@user>, ${p}mute, ${p}unmute`,
-      `${p}tagall, ${p}hidetag, ${p}ban <@user>, ${p}gclink, ${p}setdesc <text>, ${p}lock, ${p}unlock`,
+      `${p}tagall, ${p}hidetag <text>, ${p}ban <@user>, ${p}gclink, ${p}setdesc <text>, ${p}lock, ${p}unlock`,
       '',
       '👋 *Welcome*',
       `${p}welcome on|off, ${p}setwelcome <message with @user>`,
@@ -22,8 +24,12 @@ module.exports = {
       '🛡️ *Protection*',
       `${p}antilink on|off, ${p}antispam on|off`,
       '',
-      'ℹ️ *Utility*',
-      `${p}ping, ${p}mode, ${p}viewonce <expose|revoke>`
+      '⚡ *Utility*',
+      `${p}ping, ${p}mode, ${p}viewonce`,
+      '',
+      '📖 *Usage*',
+      `Type a command with the prefix "${p}" followed by command name and arguments if any.`,
+      `Example: ${p}play Despacito`
     ].join('\n')
   }
       }
