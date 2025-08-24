@@ -71,7 +71,7 @@ You can deploy this bot directly to [Railway](https://railway.app) with one clic
 
 ##  Deploy to Railway
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?repository=https://github.com/Siano77/md-bot.git)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?repository=https://github.com/Siano77/md-bot)
 ![whatsapp](https://github.com/user-attachments/assets/f71041ae-a161-44cc-9eb6-3463de12f0ec)
 
 
