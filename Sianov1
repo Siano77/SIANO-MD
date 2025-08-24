@@ -1,2 +1,26 @@
 mkdir md-bot && cd md-bot
 npm init -y
+md-bot/
+│── package.json
+│── .gitignore
+│── .env.example
+│── README.md
+│── Procfile                 # optional (Heroku-style)
+│── Dockerfile               # optional (Docker/VPS)
+│
+└── src/
+    │── index.js
+    │── handler.js
+    │
+    ├── utils/
+    │   ├── config.js
+    │   ├── store.js
+    │   ├── spamGuard.js
+    │   └── moderation.js
+    │
+    └── commands/
+        ├── help.js
+        ├── fun.js
+        ├── media.js
+        ├── admin.js
+        ├── welcome.js
