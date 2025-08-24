@@ -337,3 +337,18 @@ module.exports = {
   antilink: async ({ msg, args }) => { const onoff = (args[0]||'').toLowerCase(); if(!['on','off'].includes(onoff)) return 'Usage: #antilink on|off'; setGroupSetting(msg.key.remoteJid,'antilink', onoff==='on'); return `🔗 Anti‑link ${onoff==='on'?'enabled':'disabled'}` },
   antispam: async ({ args }) => { const onoff = (args[0]||'').toLowerCase(); if(!['on','off'].includes(onoff)) return 'Usage: #antispam on|off'; setGlobal('antispam', onoff==='on'); return `⚡ Anti‑spam ${onoff==='on'?'enabled':'disabled'}` }
 }
+const { setGroupSetting } = require('../utils/store')
+module.exports = {
+  welcome: async ({ msg, args }) => {
+    const onoff = (args[0] || '').toLowerCase()
+    if (!['on','off'].includes(onoff)) return 'Usage: #welcome on|off'
+    setGroupSetting(msg.key.remoteJid, 'welcome', onoff==='on')
+    return `👋 Welcome messages ${onoff==='on'?'enabled':'disabled'}`
+  },
+  setwelcome: async ({ msg, args }) => {
+    const text = args.join(' ')
+    if (!text) return 'Usage: #setwelcome <message — use @user>'
+    setGroupSetting(msg.key.remoteJid, 'welcomeText', text)
+    return '✅ Custom welcome message saved.'
+  }
+}
