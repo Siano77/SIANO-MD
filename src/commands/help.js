@@ -1,35 +1,26 @@
+const { prefix, botName } = require('../utils/config');
+
 module.exports = {
-  name: "help",
-  description: "Show all available commands",
-  async execute(sock, m, args, config) {
-    const helpText = `
-🤖 *${config.BOT_NAME} Command Menu* 🤖
-
-📌 General:
-#help - Show this menu
-#sticker - Make sticker from image
-#play <song name> - Download music from YouTube
-#image <query> - Search & send image
-
-😂 Fun:
-#joke - Random joke
-#meme - Random meme
-
-🎥 Media:
-#ytmp3 <url> - YouTube audio
-#ytmp4 <url> - YouTube video
-
-👮 Admin:
-#kick @user - Remove user
-#promote @user - Promote to admin
-#demote @user - Demote admin
-#antilink on/off - Toggle anti-link
-#antispam on/off - Toggle anti-spam
-
-👋 Group:
-#welcome <message> - Set custom welcome
-#welcome off - Disable welcome messages
-    `;
-    await sock.sendMessage(m.key.remoteJid, { text: helpText }, { quoted: m });
-  },
+    help: async () => {
+        const p = prefix();
+        return [
+            `🤖 *${botName()}* — Commands`,
+            '',
+            '🎮 *Fun*',
+            `${p}dice, ${p}coin, ${p}rps <rock|paper|scissors>, ${p}meme, ${p}cat, ${p}dog`,
+            '',
+            '🖼️ *Media*',
+            `${p}sticker (reply to image), ${p}play <song>, ${p}ytmp3 <url>, ${p}ytmp4 <url>`,
+            '',
+            '👑 *Admin*',
+            `${p}kick <@user>, ${p}add <number>, ${p}promote <@user>, ${p}demote <@user>, ${p}mute, ${p}unmute`,
+            `${p}tagall, ${p}hidetag <message>, ${p}ban <@user>, ${p}gclink, ${p}setdesc <text>, ${p}lock, ${p}unlock`,
+            '',
+            '👋 *Welcome*',
+            `${p}welcome on|off, ${p}setwelcome <message with @user>`,
+            '',
+            '🛡️ *Protection*',
+            `${p}antilink on|off, ${p}antispam on|off`,
+        ].join('\n');
+    }
 };
