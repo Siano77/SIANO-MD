@@ -1,6 +1,11 @@
 require('dotenv').config()
 const pino = require('pino')
-const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, downloadMediaMessage } = require('@whiskeysockets/baileys')
+const { 
+  default: makeWASocket, 
+  useMultiFileAuthState, 
+  fetchLatestBaileysVersion 
+} = require('@whiskeysockets/baileys')
+
 const handleMessage = require('./handler')
 const { getGroupSettings, ensureStore } = require('./utils/store')
 const { handleAntiLinkOnMessage } = require('./utils/moderation')
@@ -8,9 +13,7 @@ const { handleAntiLinkOnMessage } = require('./utils/moderation')
 const logger = pino({ level: 'info' })
 
 async function start() {
-  // Ensure persistent storage
   ensureStore()
-
   const { state, saveCreds } = await useMultiFileAuthState('session')
   const { version } = await fetchLatestBaileysVersion()
 
@@ -21,7 +24,6 @@ async function start() {
     printQRInTerminal: true
   })
 
-  // Save credentials automatically
   sock.ev.on('creds.update', saveCreds)
 
   // Main message pipeline
@@ -30,10 +32,18 @@ async function start() {
     if (!m || !m.message) return
 
     // Anti-link moderation
-    try { await handleAntiLinkOnMessage(sock, m) } catch (e) { logger.warn({ e }, 'Anti-link check failed') }
+    try { 
+      await handleAntiLinkOnMessage(sock, m) 
+    } catch (e) { 
+      logger.warn({ e }, 'Anti-link check failed') 
+    }
 
-    // Command handling
-    try { await handleMessage(sock, m) } catch (e) { logger.error({ e }, 'Handler failed') }
+    // Commands handler
+    try { 
+      await handleMessage(sock, m) 
+    } catch (e) { 
+      logger.error({ e }, 'Handler failed') 
+    }
   })
 
   // Welcome messages
@@ -46,9 +56,10 @@ async function start() {
       const text = (settings.welcomeText || 'Welcome to the group, @user 🎉')
         .replace(/@user/g, `@${user.split('@')[0]}`)
       await sock.sendMessage(chat, { text, mentions: [user] })
-    } catch (e) { logger.warn({ e }, 'Welcome failed') }
+    } catch (e) { 
+      logger.warn({ e }, 'Welcome failed') 
+    }
   })
 }
 
-// Start bot
 start()
