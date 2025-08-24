@@ -93,3 +93,50 @@ async function start() {
 }
 
 start()
+const { # } = require('./utils/config')
+const { isSpamming } = require('./utils/spamGuard')
+const fun = require('./commands/fun')
+const media = require('./commands/media')
+const admin = require('./commands/admin')
+const welcome = require('./commands/welcome')
+const help = require('./commands/help')
+
+const all = { ...fun, ...media, ...admin, ...welcome, ...help }
+
+function bodyOf(msg) {
+  const m = msg.message
+  return (
+    m?.conversation ||
+    m?.extendedTextMessage?.text ||
+    m?.imageMessage?.caption ||
+    m?.videoMessage?.caption ||
+    ''
+  )
+}
+
+async function handleMessage(sock, msg) {
+  const jid = msg.key.remoteJid
+  const sender = msg.key.participant || jid
+  const body = bodyOf(msg)
+  if (!body || !body.startsWith(prefix())) return
+
+  // Anti‑spam: simple cooldown per user
+  if (isSpamming(sender)) {
+    return sock.sendMessage(jid, { text: '⚠️ Slow down, you\'re sending commands too quickly.' }, { quoted: msg })
+  }
+
+  const args = body.slice(prefix().length).trim().split(/\s+/)
+  const cmd = args.shift().toLowerCase()
+
+  const handler = all[cmd]
+  if (!handler) {
+    return sock.sendMessage(jid, { text: `❓ Unknown command. Type ${prefix()}help` }, { quoted: msg })
+  }
+
+  const res = await handler({ sock, msg, args })
+  if (!res) return
+  if (typeof res === 'string') return sock.sendMessage(jid, { text: res }, { quoted: msg })
+  return sock.sendMessage(jid, res, { quoted: msg })
+}
+
+module.exports = handleMessage
