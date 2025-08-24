@@ -22,7 +22,7 @@ flyctl auth login
 
 Step 2 — Clone & Prepare Repo
 
-git clone https://github.com/YOUR-USERNAME/md-whatsapp-bot.git
+git clone https://github.com/Siano77/siano-md-whatsapp-bot.git
 cd md-whatsapp-bot
 
 # Install dependencies
