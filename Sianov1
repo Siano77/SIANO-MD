@@ -1,5 +1,6 @@
-mkdir md-bot && cd md-bot
-npm init -y
+"scripts": {
+  "start": "node index.js"
+}
 md-bot/
 │── package.json
 │── .gitignore
