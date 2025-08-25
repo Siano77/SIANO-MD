@@ -1,7 +1,7 @@
 {
   "name": "siano-md",
   "version": "1.0.0",
-  "description": "WhatsApp + Telegram Multi-Device Bot",
+  "description": "WhatsApp + Wake Up To Reality💥",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
