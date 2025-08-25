@@ -3,7 +3,9 @@
 # =====================
 node_modules/
 npm-debug.log*
+yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # =====================
 # Environment files
@@ -13,35 +15,25 @@ yarn-error.log*
 .env.*.local
 
 # =====================
-# Logs
+# WhatsApp session / credentials
 # =====================
-logs/
-*.log
-pids/
-*.pid
-*.seed
-*.pid.lock
+auth_info/      # Stores WhatsApp session info
+session/        # Alternative session folder if used
 
 # =====================
-# Build outputs
+# Build & logs
 # =====================
 dist/
 build/
+coverage/
+*.log
 
 # =====================
-# OS files
+# OS & IDE files
 # =====================
 .DS_Store
 Thumbs.db
-
-# =====================
-# WhatsApp bot session & data
-# =====================
-session/
-data/
-auth_info/
-
-# =====================
-# VSCode settings
-# =====================
+.idea/
 .vscode/
+*.sublime-project
+*.sublime-workspace
