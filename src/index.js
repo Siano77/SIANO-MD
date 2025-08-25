@@ -1,71 +1,39 @@
 require('dotenv').config();
+const makeWASocket = require('@whiskeysockets/baileys').default;
+const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const TelegramBot = require('node-telegram-bot-api');
 const pino = require('pino');
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    fetchLatestBaileysVersion,
-    DisconnectReason
-} = require('@whiskeysockets/baileys');
 
-const handleMessage = require('./handler');
-const { getGroupSettings, ensureStore } = require('./utils/store');
-const { handleAntiLinkOnMessage } = require('./utils/moderation');
+(async () => {
+  // WhatsApp Section
+  const { state, saveCreds } = await useMultiFileAuthState('auth');
+  const sock = makeWASocket({
+    auth: state,
+    logger: pino({ level: 'silent' }),
+    printQRInTerminal: true
+  });
 
-const logger = pino({ level: 'info' });
+  sock.ev.on('creds.update', saveCreds);
 
-async function start() {
-    ensureStore();
+  sock.ev.on('messages.upsert', async (m) => {
+    const msg = m.messages[0];
+    if (!msg.message) return;
 
-    const { state, saveCreds } = await useMultiFileAuthState('session');
-    const { version } = await fetchLatestBaileysVersion();
+    const from = msg.key.remoteJid;
+    const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
-    const sock = makeWASocket({
-        version,
-        logger,
-        auth: state,
-        printQRInTerminal: false,
-        browser: ['SIANO-MD', 'Chrome', '100.0.0']
-    });
+    if (text && text.startsWith(process.env.PREFIX)) {
+      await sock.sendMessage(from, { text: `WhatsApp Bot says: You typed ${text}` });
+    }
+  });
 
-    sock.ev.on('creds.update', saveCreds);
+  // Telegram Section
+  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+  const tgBot = new TelegramBot(telegramToken, { polling: true });
 
-    sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
-        if (connection === 'close') {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            logger.info({lastDisconnect, reconnecting: shouldReconnect}, 'Connection closed, reconnecting...');
-            if (shouldReconnect) start();
-            else logger.warn('Logged out. Please re-authenticate.');
-        } else if (connection === 'open') {
-            logger.info('Connection opened!');
-        }
-    });
+  tgBot.on('message', (msg) => {
+    tgBot.sendMessage(msg.chat.id, `Hello ${msg.from.first_name}, Telegram bot is live 🚀`);
+  });
 
-    sock.ev.on('messages.upsert', async ({ messages }) => {
-        const m = messages[0];
-        if (!m || !m.message) return;
-
-        try { await handleAntiLinkOnMessage(sock, m); } 
-        catch (e) { logger.warn({ e }, 'Anti-link check failed'); }
-
-        try { await handleMessage(sock, m); } 
-        catch (e) { logger.error({ e }, 'Handler failed'); }
-    });
-
-    sock.ev.on('group-participants.update', async (update) => {
-        try {
-            const chat = update.id;
-            const settings = getGroupSettings(chat);
-            if (!settings.welcome || update.action !== 'add') return;
-
-            const user = update.participants[0];
-            const text = (settings.welcomeText || 'Welcome to the group, @user 🎉')
-                .replace(/@user/g, `@${user.split('@')[0]}`);
-            await sock.sendMessage(chat, { text, mentions: [user] });
-        } catch (e) {
-            logger.warn({ e }, 'Welcome failed');
-        }
-    });
-}
-
-start();
+  console.log("✅ WhatsApp + Telegram Bot is running...");
+})();
