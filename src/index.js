@@ -1,115 +1,94 @@
-// index.js
-
-import makeWASocket, {
-  useMultiFileAuthState,
-  DisconnectReason
-} from "@whiskeysockets/baileys";
+// src/index.js
 import TelegramBot from "node-telegram-bot-api";
+import makeWASocket, { useMultiFileAuthState } from "@whiskeysockets/baileys";
 import qrcode from "qrcode";
 import fs from "fs";
 import path from "path";
 
-// 🔑 Telegram bot token from BotFather (set in .env)
-const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+// ================== CONFIG ================== //
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN; // set in Render env vars
+const SESSIONS_DIR = path.join(process.cwd(), "sessions");
+
+// Ensure sessions folder exists
+if (!fs.existsSync(SESSIONS_DIR)) {
+  fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+}
+
+// Initialize Telegram bot (polling)
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
-// 🟢 Active WhatsApp sessions stored by telegramId
-const sessions = {};
+// Store WhatsApp sockets per user
+const userSessions = {};
 
-/**
- * Start or restore a WhatsApp session for a Telegram user
- */
-async function startSession(telegramId, chatId) {
+// ================== TELEGRAM COMMANDS ================== //
+
+// /start
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(
+    chatId,
+    `👋 Welcome to *SIANO-MD WhatsApp Bot*!\n\nUse /pair to connect your WhatsApp account.`,
+    { parse_mode: "Markdown" }
+  );
+});
+
+// /pair
+bot.onText(/\/pair/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = String(chatId);
+
+  bot.sendMessage(chatId, "📌 Please wait... Generating your WhatsApp QR code.");
+
   try {
-    const authDir = `./auth_info/${telegramId}`;
-    if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
+    // Use unique folder for each user
+    const userSessionPath = path.join(SESSIONS_DIR, userId);
+    const { state, saveCreds } = await useMultiFileAuthState(userSessionPath);
 
-    const { state, saveCreds } = await useMultiFileAuthState(authDir);
-
+    // Create WhatsApp socket
     const sock = makeWASocket({
       auth: state,
-      printQRInTerminal: false
+      printQRInTerminal: false,
+      browser: ["SIANO-MD", "Chrome", "1.0.0"],
     });
 
-    // 📌 Handle WhatsApp connection updates
+    // Save session for this user
+    userSessions[userId] = sock;
+
+    sock.ev.on("creds.update", saveCreds);
+
     sock.ev.on("connection.update", async (update) => {
-      const { connection, qr, lastDisconnect } = update;
+      const { qr, connection, lastDisconnect } = update;
 
       if (qr) {
-        // Save QR code as image and send to Telegram
-        const qrImagePath = path.join(authDir, "qr.png");
-        await qrcode.toFile(qrImagePath, qr);
-        await bot.sendPhoto(chatId, qrImagePath, {
-          caption: "📌 Scan this QR with WhatsApp to pair your account."
+        const qrImage = await qrcode.toBuffer(qr);
+        bot.sendPhoto(chatId, qrImage, {
+          caption: "📌 Scan this QR code with your WhatsApp to connect.",
         });
       }
 
-      if (connection === "close") {
-        const shouldReconnect =
-          lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-
-        if (shouldReconnect) {
-          console.log(`🔄 Reconnecting WhatsApp for ${telegramId}...`);
-          startSession(telegramId, chatId);
-        } else {
-          bot.sendMessage(
-            chatId,
-            "⚠️ WhatsApp session ended. Please run /pair again."
-          );
-          delete sessions[telegramId];
-        }
-      } else if (connection === "open") {
-        bot.sendMessage(chatId, "✅ WhatsApp connected successfully!");
+      if (connection === "open") {
+        bot.sendMessage(chatId, "✅ WhatsApp Connected Successfully!");
+      } else if (connection === "close") {
+        bot.sendMessage(
+          chatId,
+          "⚠️ WhatsApp disconnected. Run /pair again if needed."
+        );
       }
     });
-
-    // Save new credentials if they update
-    sock.ev.on("creds.update", saveCreds);
-
-    // Store session reference
-    sessions[telegramId] = sock;
   } catch (err) {
-    console.error("❌ Error starting session:", err);
-    bot.sendMessage(chatId, "❌ Failed to start WhatsApp session.");
+    console.error("Error in /pair:", err);
+    bot.sendMessage(chatId, "❌ Failed to create WhatsApp session. Try again.");
   }
-}
-
-// 📌 Telegram command: /pair
-bot.onText(/\/pair/, async (msg) => {
-  const chatId = msg.chat.id;
-  const telegramId = msg.from.id.toString();
-
-  if (sessions[telegramId]) {
-    bot.sendMessage(
-      chatId,
-      "✅ You already have an active WhatsApp session. No need to pair again."
-    );
-    return;
-  }
-
-  bot.sendMessage(
-    chatId,
-    "📌 Please wait, your WhatsApp QR code will be sent shortly..."
-  );
-  await startSession(telegramId, chatId);
 });
 
-// 📌 Optional: Telegram command to logout
-bot.onText(/\/logout/, async (msg) => {
+// /status
+bot.onText(/\/status/, async (msg) => {
   const chatId = msg.chat.id;
-  const telegramId = msg.from.id.toString();
+  const userId = String(chatId);
 
-  if (!sessions[telegramId]) {
-    bot.sendMessage(chatId, "⚠️ You don’t have an active WhatsApp session.");
-    return;
-  }
-
-  try {
-    await sessions[telegramId].logout();
-    delete sessions[telegramId];
-    bot.sendMessage(chatId, "✅ Logged out successfully. Run /pair to connect again.");
-  } catch (err) {
-    console.error("❌ Logout error:", err);
-    bot.sendMessage(chatId, "❌ Failed to logout your WhatsApp session.");
+  if (userSessions[userId]) {
+    bot.sendMessage(chatId, "✅ Your WhatsApp session is active.");
+  } else {
+    bot.sendMessage(chatId, "⚠️ No active WhatsApp session. Use /pair to connect.");
   }
 });
