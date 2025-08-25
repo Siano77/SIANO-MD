@@ -1,39 +1,77 @@
 require('dotenv').config();
 const makeWASocket = require('@whiskeysockets/baileys').default;
 const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const TelegramBot = require('node-telegram-bot-api');
 const pino = require('pino');
+const TelegramBot = require('node-telegram-bot-api');
+const express = require('express');
 
-(async () => {
-  // WhatsApp Section
-  const { state, saveCreds } = await useMultiFileAuthState('auth');
+// =====================
+// WhatsApp Bot Section
+// =====================
+async function startWhatsAppBot() {
+  const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+
   const sock = makeWASocket({
     auth: state,
-    logger: pino({ level: 'silent' }),
-    printQRInTerminal: true
+    printQRInTerminal: true,
+    logger: pino({ level: 'silent' })
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('messages.upsert', async (m) => {
-    const msg = m.messages[0];
-    if (!msg.message) return;
-
-    const from = msg.key.remoteJid;
-    const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
-
-    if (text && text.startsWith(process.env.PREFIX)) {
-      await sock.sendMessage(from, { text: `WhatsApp Bot says: You typed ${text}` });
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect, qr } = update;
+    if (qr) {
+      console.log("📲 Scan this QR code to connect WhatsApp:", qr);
+    }
+    if (connection === 'open') {
+      console.log('✅ WhatsApp bot is connected!');
+    } else if (connection === 'close') {
+      console.log('❌ WhatsApp connection closed. Retrying...');
+      startWhatsAppBot();
     }
   });
 
-  // Telegram Section
-  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
-  const tgBot = new TelegramBot(telegramToken, { polling: true });
+  sock.ev.on('messages.upsert', async (msg) => {
+    const m = msg.messages[0];
+    if (!m.message || m.key.fromMe) return;
 
-  tgBot.on('message', (msg) => {
-    tgBot.sendMessage(msg.chat.id, `Hello ${msg.from.first_name}, Telegram bot is live 🚀`);
+    const from = m.key.remoteJid;
+    const text = m.message.conversation || m.message.extendedTextMessage?.text;
+
+    if (text?.startsWith(process.env.PREFIX)) {
+      const command = text.slice(1).trim().toLowerCase();
+
+      if (command === 'ping') {
+        await sock.sendMessage(from, { text: 'pong 🏓' });
+      }
+    }
   });
+}
 
-  console.log("✅ WhatsApp + Telegram Bot is running...");
-})();
+startWhatsAppBot();
+
+// =====================
+// Telegram Bot Section
+// =====================
+const tgBot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+
+tgBot.on('message', (msg) => {
+  tgBot.sendMessage(msg.chat.id, `Hello ${msg.from.first_name}, your Telegram bot is live 🚀`);
+});
+
+console.log("✅ Telegram bot is running!");
+
+// =====================
+// Express Web Server (for Render)
+// =====================
+const app = express();
+
+app.get('/', (req, res) => {
+  res.send('✅ SIANO-MD (WhatsApp + Telegram Bot) is running on Render!');
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🌍 Web server running on port ${PORT}`);
+});
