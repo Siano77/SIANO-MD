@@ -1,7 +1,7 @@
 {
   "name": "siano-md",
   "version": "1.0.0",
-  "description": "WhatsApp + Wake Up To Reality💥",
+  "description": "Wake Up To Reality",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
@@ -11,17 +11,22 @@
     "whatsapp",
     "telegram",
     "bot",
-    "baileys"
+    "baileys",
+    "siano-md"
   ],
   "author": "SIANO",
   "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.7",
     "dotenv": "^16.4.5",
-    "pino": "^8.15.0",
-    "node-telegram-bot-api": "^0.61.0"
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.61.0",
+    "pino": "^8.15.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": "22.16.0"
   }
 }
