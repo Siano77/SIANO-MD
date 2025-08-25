@@ -1,15 +1,18 @@
 {
   "name": "siano-md-bot",
   "version": "1.0.0",
-  "description": "Wake Up To Reality",
-  "main": "index.js",
+  "description": "SIANO-MD WhatsApp Multi-Device Telegram Bridge Bot",
+  "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18.x"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.6.0",
-    "node-telegram-bot-api": "^0.61.0",
+    "node-telegram-bot-api": "^0.66.0",
     "qrcode": "^1.5.3"
   }
 }
