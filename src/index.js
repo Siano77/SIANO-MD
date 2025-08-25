@@ -1,71 +1,93 @@
 require('dotenv').config();
 const makeWASocket = require('@whiskeysockets/baileys').default;
-const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { useMultiFileAuthState, generatePairingCode } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const TelegramBot = require('node-telegram-bot-api');
 const express = require('express');
 
 // =====================
-// WhatsApp Auth Setup
+// Env variables
 // =====================
-async function initWhatsAppSocket() {
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const OWNER_TELEGRAM_ID = process.env.OWNER_TELEGRAM_ID;
+const PREFIX = process.env.PREFIX || '#';
+
+// =====================
+// Init Telegram Bot
+// =====================
+const tgBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
+
+// =====================
+// WhatsApp Bot Section
+// =====================
+let waSock;
+async function startWhatsAppBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
-  const sock = makeWASocket({
+  waSock = makeWASocket({
     auth: state,
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
-    mobile: { version: [2, 3000, 101] } // ✅ mobile mode needed for pairing codes
+    browser: ['SIANO-MD', 'Chrome', '100.0.0']
   });
 
-  sock.ev.on('creds.update', saveCreds);
-  return sock;
+  waSock.ev.on('creds.update', saveCreds);
+
+  waSock.ev.on('connection.update', (update) => {
+    const { connection } = update;
+
+    if (connection === 'open') {
+      tgBot.sendMessage(OWNER_TELEGRAM_ID, '✅ WhatsApp Bot connected successfully!');
+    } else if (connection === 'close') {
+      tgBot.sendMessage(OWNER_TELEGRAM_ID, '⚠️ WhatsApp Bot disconnected. Reconnecting...');
+      startWhatsAppBot();
+    }
+  });
 }
 
-// =====================
-// Telegram Bot Section
-// =====================
-const tgBot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+startWhatsAppBot();
 
-tgBot.onText(/\/pair (.+)/, async (msg, match) => {
+// =====================
+// Telegram Pair Command
+// =====================
+tgBot.onText(/\/pair/, async (msg) => {
   const chatId = msg.chat.id;
-  const phoneNumber = match[1];
-
-  tgBot.sendMessage(chatId, `⏳ Generating pairing code for *${phoneNumber}*...`, { parse_mode: "Markdown" });
-
-  try {
-    const waSock = await initWhatsAppSocket();
-    const code = await waSock.requestPairingCode(phoneNumber);
-
-    console.log("✅ Pairing code generated:", code);
-    tgBot.sendMessage(chatId, `📌 Your WhatsApp Pairing Code: *${code}*`, { parse_mode: "Markdown" });
-  } catch (err) {
-    console.error("❌ Pairing error details:", err);
-    tgBot.sendMessage(chatId, "❌ Failed to generate pairing code.\n\nError: " + err.message);
+  if (chatId.toString() !== OWNER_TELEGRAM_ID) {
+    return tgBot.sendMessage(chatId, '❌ You are not authorized to pair the bot.');
   }
+
+  tgBot.sendMessage(chatId, '📌 Please reply with the WhatsApp number you want to link (with country code, e.g., 2348012345678):');
+
+  const numberListener = async (replyMsg) => {
+    if (replyMsg.chat.id !== chatId) return;
+
+    const phoneNumber = replyMsg.text.replace(/\D/g, ''); // remove non-numeric
+    tgBot.removeListener('message', numberListener);
+
+    try {
+      const pairingCode = await generatePairingCode(waSock, phoneNumber);
+      tgBot.sendMessage(chatId, `✅ WhatsApp pairing code for ${phoneNumber}: \`${pairingCode}\`\n\nScan it in WhatsApp Settings > Linked Devices`, { parse_mode: 'Markdown' });
+    } catch (err) {
+      console.error('Pairing error:', err);
+      tgBot.sendMessage(chatId, `❌ Failed to generate pairing code: ${err.message}`);
+    }
+  };
+
+  tgBot.on('message', numberListener);
 });
 
 // =====================
-// Default Telegram Reply
+// Telegram Generic Message
 // =====================
 tgBot.on('message', (msg) => {
-  if (!msg.text.startsWith('/pair')) {
-    tgBot.sendMessage(msg.chat.id, `Hello ${msg.from.first_name}, use:\n\n/pair <YourNumber>\n\nExample:\n/pair 2348012345678`);
+  if (msg.text && !msg.text.startsWith('/pair')) {
+    tgBot.sendMessage(msg.chat.id, `Hello ${msg.from.first_name}, your Telegram bot is live! Use /pair to link WhatsApp.`);
   }
 });
-
-console.log("✅ Telegram bot is running!");
 
 // =====================
 // Express Web Server (Render)
-// =====================
 const app = express();
-
-app.get('/', (req, res) => {
-  res.send('✅ SIANO-MD (WhatsApp + Telegram Bot) is running on Render!');
-});
-
+app.get('/', (req, res) => res.send('✅ SIANO-MD (WhatsApp + Telegram Bot) is running on Render!'));
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🌍 Web server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🌍 Web server running on port ${PORT}`));
