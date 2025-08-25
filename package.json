@@ -1,14 +1,27 @@
 {
   "name": "siano-md",
   "version": "1.0.0",
+  "description": "WhatsApp + Telegram Multi-Device Bot",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
   },
+  "keywords": [
+    "whatsapp",
+    "telegram",
+    "bot",
+    "baileys"
+  ],
+  "author": "SIANO",
+  "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.7",
     "dotenv": "^16.4.5",
     "pino": "^8.15.0",
     "node-telegram-bot-api": "^0.61.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
   }
 }
