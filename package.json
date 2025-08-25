@@ -1,7 +1,7 @@
 {
   "name": "siano-md",
   "version": "1.0.0",
-  "description": "WhatsApp + Telegram Multi-Device Bot",
+  "description": "Wake Up To Reality",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
@@ -11,10 +11,9 @@
     "whatsapp",
     "telegram",
     "bot",
-    "baileys",
-    "qrcode"
+    "baileys"
   ],
-  "author": "Your Name",
+  "author": "SIANO",
   "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.7",
@@ -26,8 +25,5 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
-  },
-  "engines": {
-    "node": ">=22.16.0"
   }
 }
