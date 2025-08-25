@@ -6,6 +6,18 @@ const TelegramBot = require('node-telegram-bot-api');
 const express = require('express');
 
 // =====================
+// Telegram Bot Section
+// =====================
+const tgBot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+const OWNER_TELEGRAM_ID = process.env.OWNER_TELEGRAM_ID; // add this to your .env
+
+tgBot.on('message', (msg) => {
+  tgBot.sendMessage(msg.chat.id, `Hello ${msg.from.first_name}, your Telegram bot is live 🚀`);
+});
+
+console.log("✅ Telegram bot is running!");
+
+// =====================
 // WhatsApp Bot Section
 // =====================
 async function startWhatsAppBot() {
@@ -13,7 +25,7 @@ async function startWhatsAppBot() {
 
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: true,
+    printQRInTerminal: false, // 🚫 don’t print in Render logs
     logger: pino({ level: 'silent' })
   });
 
@@ -21,13 +33,22 @@ async function startWhatsAppBot() {
 
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
+
     if (qr) {
-      console.log("📲 Scan this QR code to connect WhatsApp:", qr);
+      // 📩 Send QR/Pairing code to your Telegram
+      tgBot.sendMessage(
+        OWNER_TELEGRAM_ID,
+        `📌 Your WhatsApp Pairing Code:\n\n\`${qr}\`\n\n⚠️ Scan this within 20 seconds in WhatsApp > Linked Devices.`,
+        { parse_mode: "Markdown" }
+      );
     }
+
     if (connection === 'open') {
       console.log('✅ WhatsApp bot is connected!');
+      tgBot.sendMessage(OWNER_TELEGRAM_ID, "✅ WhatsApp bot connected successfully!");
     } else if (connection === 'close') {
       console.log('❌ WhatsApp connection closed. Retrying...');
+      tgBot.sendMessage(OWNER_TELEGRAM_ID, "⚠️ WhatsApp bot disconnected. Reconnecting...");
       startWhatsAppBot();
     }
   });
@@ -50,17 +71,6 @@ async function startWhatsAppBot() {
 }
 
 startWhatsAppBot();
-
-// =====================
-// Telegram Bot Section
-// =====================
-const tgBot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
-
-tgBot.on('message', (msg) => {
-  tgBot.sendMessage(msg.chat.id, `Hello ${msg.from.first_name}, your Telegram bot is live 🚀`);
-});
-
-console.log("✅ Telegram bot is running!");
 
 // =====================
 // Express Web Server (for Render)
