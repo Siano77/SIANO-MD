@@ -27,6 +27,9 @@ if (!AUTHORIZED_USERS.includes(OWNER_TELEGRAM_ID)) AUTHORIZED_USERS.push(OWNER_T
 // =====================
 const tgBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 
+// Track listeners per user to prevent spam
+const activePairing = new Map();
+
 // =====================
 // Helper: WhatsApp session path per Telegram user
 // =====================
@@ -34,7 +37,7 @@ const getSessionPath = (telegramId) =>
     path.join(__dirname, 'sessions', `wa_${telegramId}`);
 
 // =====================
-// Extract message text (handles all cases)
+// Extract WhatsApp Message Text
 // =====================
 function extractMessageText(msg) {
     try {
@@ -87,8 +90,8 @@ async function startWhatsAppBot(telegramId, phoneNumber) {
                     qrImage.replace(/^data:image\/png;base64,/, ''),
                     'base64'
                 );
-                tgBot.sendPhoto(telegramId, buffer, {
-                    caption: `📲 WhatsApp QR code for ${phoneNumber}. Scan quickly in WhatsApp > Linked Devices (valid 60s)`
+                await tgBot.sendPhoto(telegramId, buffer, {
+                    caption: `📲 WhatsApp QR code for ${phoneNumber}. Scan in WhatsApp > Linked Devices`
                 });
             } catch (err) {
                 console.error('QR send error:', err);
@@ -127,39 +130,28 @@ async function startWhatsAppBot(telegramId, phoneNumber) {
         const msg = messages[0];
         if (!msg.message || msg.key.fromMe) return;
 
-        console.log('📩 Incoming Message:', JSON.stringify(msg, null, 2));
-
         const text = extractMessageText(msg);
-        if (!text) return;
+        if (!text || !text.startsWith(PREFIX)) return; // ONLY respond to prefixed commands
 
         const sender = msg.key.remoteJid;
+        const commandBody = text.slice(PREFIX.length).trim();
+        const [command, ...args] = commandBody.split(' ');
 
-        // Commands with prefix
-        if (text.startsWith(PREFIX)) {
-            const commandBody = text.slice(PREFIX.length).trim();
-            const [command, ...args] = commandBody.split(' ');
+        switch (command.toLowerCase()) {
+            case 'ping':
+                await sock.sendMessage(sender, { text: '🏓 Pong!' });
+                break;
 
-            switch (command.toLowerCase()) {
-                case 'ping':
-                    await sock.sendMessage(sender, { text: '🏓 Pong!' });
-                    break;
+            case 'help':
+                await sock.sendMessage(sender, {
+                    text: `📖 Commands:\n${PREFIX}ping - Check bot\n${PREFIX}help - Show this list`
+                });
+                break;
 
-                case 'help':
-                    await sock.sendMessage(sender, {
-                        text: `📖 Available commands:\n${PREFIX}ping - Check bot\n${PREFIX}help - Command list`
-                    });
-                    break;
-
-                default:
-                    await sock.sendMessage(sender, {
-                        text: `❓ Unknown command: ${command}\nUse ${PREFIX}help to see commands.`
-                    });
-            }
-        } else {
-            // Generic reply
-            await sock.sendMessage(sender, {
-                text: `👋 Hello! Use ${PREFIX}help to see commands.`
-            });
+            default:
+                await sock.sendMessage(sender, {
+                    text: `❓ Unknown command: ${command}\nUse ${PREFIX}help`
+                });
         }
     });
 
@@ -184,6 +176,10 @@ tgBot.onText(/\/pair/, async (msg) => {
         return tgBot.sendMessage(chatId, '❌ You are not authorized to pair the bot.');
     }
 
+    if (activePairing.has(chatId)) {
+        return tgBot.sendMessage(chatId, '⚠️ You are already in pairing mode.');
+    }
+
     tgBot.sendMessage(
         chatId,
         '📌 Reply with your WhatsApp number (with country code, e.g., 2348012345678):'
@@ -194,12 +190,13 @@ tgBot.onText(/\/pair/, async (msg) => {
 
         const phoneNumber = replyMsg.text.replace(/\D/g, '');
         tgBot.removeListener('message', numberListener);
+        activePairing.delete(chatId);
 
         try {
             await startWhatsAppBot(chatId, phoneNumber);
             tgBot.sendMessage(
                 chatId,
-                `✅ WhatsApp pairing process started for ${phoneNumber}. QR code should arrive shortly.`
+                `✅ WhatsApp pairing started for ${phoneNumber}. QR code will be sent shortly.`
             );
         } catch (err) {
             console.error('Pairing error:', err);
@@ -211,20 +208,7 @@ tgBot.onText(/\/pair/, async (msg) => {
     };
 
     tgBot.on('message', numberListener);
-});
-
-// Generic message reply for unauthorized messages
-tgBot.on('message', (msg) => {
-    if (
-        msg.text &&
-        !msg.text.startsWith('/pair') &&
-        !msg.text.startsWith('/start')
-    ) {
-        tgBot.sendMessage(
-            msg.chat.id,
-            `Hello ${msg.from.first_name}, use /pair to link your WhatsApp.`
-        );
-    }
+    activePairing.set(chatId, true);
 });
 
 // =====================
