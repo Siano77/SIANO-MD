@@ -17,7 +17,7 @@ const path = require('path');
 // =====================
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OWNER_TELEGRAM_ID = process.env.OWNER_TELEGRAM_ID;
-const PREFIX = process.env.PREFIX || '#';
+const PREFIX = '#'; // Fixed prefix as requested
 const AUTHORIZED_USERS = (process.env.AUTHORIZED_USERS || '').split(',');
 
 if (!AUTHORIZED_USERS.includes(OWNER_TELEGRAM_ID)) AUTHORIZED_USERS.push(OWNER_TELEGRAM_ID);
@@ -122,7 +122,7 @@ async function startWhatsAppBot(telegramId, phoneNumber) {
     });
 
     // =====================
-    // WhatsApp Message Listener
+    // WhatsApp Message Listener (Commands only)
     // =====================
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
@@ -218,7 +218,7 @@ const app = express();
 app.get('/', (req, res) =>
     res.send('✅ SIANO-MD WhatsApp + Telegram Bot running on Render!')
 );
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000; // Updated to 4000
 app.listen(PORT, () =>
     console.log(`🌍 Web server running on port ${PORT}`)
 );
