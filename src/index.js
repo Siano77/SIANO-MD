@@ -30,20 +30,25 @@ const tgBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 // =====================
 // Helper: WhatsApp session path per Telegram user
 // =====================
-const getSessionPath = (telegramId) => path.join(__dirname, 'sessions', `wa_${telegramId}`);
+const getSessionPath = (telegramId) =>
+    path.join(__dirname, 'sessions', `wa_${telegramId}`);
 
 // =====================
-// Helper: Extract text from any WhatsApp message
+// Extract message text (handles all cases)
 // =====================
 function extractMessageText(msg) {
     try {
-        if (msg.message.conversation) return msg.message.conversation;
-        if (msg.message.extendedTextMessage) return msg.message.extendedTextMessage.text;
-        if (msg.message.imageMessage?.caption) return msg.message.imageMessage.caption;
-        if (msg.message.videoMessage?.caption) return msg.message.videoMessage.caption;
-        if (msg.message.buttonsResponseMessage) return msg.message.buttonsResponseMessage.selectedButtonId;
-        if (msg.message.listResponseMessage) return msg.message.listResponseMessage.singleSelectReply.selectedRowId;
-        return null;
+        return (
+            msg?.message?.conversation ||
+            msg?.message?.extendedTextMessage?.text ||
+            msg?.message?.imageMessage?.caption ||
+            msg?.message?.videoMessage?.caption ||
+            msg?.message?.buttonsResponseMessage?.selectedButtonId ||
+            msg?.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+            msg?.message?.documentWithCaptionMessage?.caption ||
+            msg?.message?.templateButtonReplyMessage?.selectedId ||
+            null
+        );
     } catch {
         return null;
     }
@@ -69,41 +74,60 @@ async function startWhatsAppBot(telegramId, phoneNumber) {
 
     sock.ev.on('creds.update', saveCreds);
 
-    // Connection updates
+    // =====================
+    // Connection Updates
+    // =====================
     sock.ev.on('connection.update', async (update) => {
         const { connection, qr, lastDisconnect } = update;
 
         if (qr) {
             try {
                 const qrImage = await QRCode.toDataURL(qr);
-                const base64Data = qrImage.replace(/^data:image\/png;base64,/, '');
-                const buffer = Buffer.from(base64Data, 'base64');
+                const buffer = Buffer.from(
+                    qrImage.replace(/^data:image\/png;base64,/, ''),
+                    'base64'
+                );
                 tgBot.sendPhoto(telegramId, buffer, {
-                    caption: `📲 Scan this WhatsApp QR for ${phoneNumber}\n(Open WhatsApp > Linked Devices)`
+                    caption: `📲 WhatsApp QR code for ${phoneNumber}. Scan quickly in WhatsApp > Linked Devices (valid 60s)`
                 });
             } catch (err) {
-                console.error('QR send error:', err.message);
+                console.error('QR send error:', err);
             }
         }
 
         if (connection === 'open') {
-            tgBot.sendMessage(telegramId, `✅ WhatsApp Bot connected for ${phoneNumber}`);
+            tgBot.sendMessage(
+                telegramId,
+                `✅ WhatsApp Bot connected successfully for ${phoneNumber}!`
+            );
         }
 
         if (connection === 'close') {
-            tgBot.sendMessage(telegramId, `⚠️ Disconnected for ${phoneNumber}, retrying in 5s...`);
-            await delay(5000);
-            startWhatsAppBot(telegramId, phoneNumber);
+            const shouldReconnect =
+                lastDisconnect?.error?.output?.statusCode !== 401; // Don't loop on invalid sessions
+            tgBot.sendMessage(
+                telegramId,
+                `⚠️ WhatsApp Bot disconnected for ${phoneNumber}. ${
+                    shouldReconnect ? 'Reconnecting...' : 'Session ended.'
+                }`
+            );
+            if (shouldReconnect) {
+                await delay(5000);
+                startWhatsAppBot(telegramId, phoneNumber);
+            }
         }
     });
 
     // =====================
-    // WhatsApp Message Handler
+    // WhatsApp Message Listener
     // =====================
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
+
         const msg = messages[0];
         if (!msg.message || msg.key.fromMe) return;
+
+        console.log('📩 Incoming Message:', JSON.stringify(msg, null, 2));
 
         const text = extractMessageText(msg);
         if (!text) return;
@@ -113,7 +137,7 @@ async function startWhatsAppBot(telegramId, phoneNumber) {
         // Commands with prefix
         if (text.startsWith(PREFIX)) {
             const commandBody = text.slice(PREFIX.length).trim();
-            const [command] = commandBody.split(' ');
+            const [command, ...args] = commandBody.split(' ');
 
             switch (command.toLowerCase()) {
                 case 'ping':
@@ -122,16 +146,20 @@ async function startWhatsAppBot(telegramId, phoneNumber) {
 
                 case 'help':
                     await sock.sendMessage(sender, {
-                        text: `📖 Commands:\n${PREFIX}ping - Test bot\n${PREFIX}help - Show this list`
+                        text: `📖 Available commands:\n${PREFIX}ping - Check bot\n${PREFIX}help - Command list`
                     });
                     break;
 
                 default:
-                    await sock.sendMessage(sender, { text: `❌ Unknown command: ${command}\nType ${PREFIX}help` });
+                    await sock.sendMessage(sender, {
+                        text: `❓ Unknown command: ${command}\nUse ${PREFIX}help to see commands.`
+                    });
             }
         } else {
-            // Generic reply (only once per chat, no spam)
-            await sock.sendMessage(sender, { text: `👋 Hello! Type ${PREFIX}help to see commands.` });
+            // Generic reply
+            await sock.sendMessage(sender, {
+                text: `👋 Hello! Use ${PREFIX}help to see commands.`
+            });
         }
     });
 
@@ -142,7 +170,11 @@ async function startWhatsAppBot(telegramId, phoneNumber) {
 // Telegram Commands
 // =====================
 tgBot.onText(/\/start/, (msg) => {
-    tgBot.sendMessage(msg.chat.id, `Hello ${msg.from.first_name}!\nUse /pair to link your WhatsApp number.`);
+    const chatId = msg.chat.id;
+    tgBot.sendMessage(
+        chatId,
+        `Hello ${msg.from.first_name}!\nUse /pair to link your WhatsApp number.`
+    );
 });
 
 tgBot.onText(/\/pair/, async (msg) => {
@@ -152,7 +184,10 @@ tgBot.onText(/\/pair/, async (msg) => {
         return tgBot.sendMessage(chatId, '❌ You are not authorized to pair the bot.');
     }
 
-    tgBot.sendMessage(chatId, '📌 Send your WhatsApp number (with country code, e.g., 2348012345678):');
+    tgBot.sendMessage(
+        chatId,
+        '📌 Reply with your WhatsApp number (with country code, e.g., 2348012345678):'
+    );
 
     const numberListener = async (replyMsg) => {
         if (replyMsg.chat.id !== chatId) return;
@@ -162,20 +197,33 @@ tgBot.onText(/\/pair/, async (msg) => {
 
         try {
             await startWhatsAppBot(chatId, phoneNumber);
-            tgBot.sendMessage(chatId, `✅ Pairing started for ${phoneNumber}. QR will arrive shortly.`);
+            tgBot.sendMessage(
+                chatId,
+                `✅ WhatsApp pairing process started for ${phoneNumber}. QR code should arrive shortly.`
+            );
         } catch (err) {
-            console.error('Pairing error:', err.message);
-            tgBot.sendMessage(chatId, `❌ Failed: ${err.message}`);
+            console.error('Pairing error:', err);
+            tgBot.sendMessage(
+                chatId,
+                `❌ Failed to start WhatsApp session: ${err.message}`
+            );
         }
     };
 
     tgBot.on('message', numberListener);
 });
 
-// Fallback reply for unauthorized msgs
+// Generic message reply for unauthorized messages
 tgBot.on('message', (msg) => {
-    if (msg.text && !msg.text.startsWith('/pair') && !msg.text.startsWith('/start')) {
-        tgBot.sendMessage(msg.chat.id, `Hello ${msg.from.first_name}, use /pair to link your WhatsApp.`);
+    if (
+        msg.text &&
+        !msg.text.startsWith('/pair') &&
+        !msg.text.startsWith('/start')
+    ) {
+        tgBot.sendMessage(
+            msg.chat.id,
+            `Hello ${msg.from.first_name}, use /pair to link your WhatsApp.`
+        );
     }
 });
 
@@ -183,6 +231,10 @@ tgBot.on('message', (msg) => {
 // Express Web Server (Render)
 // =====================
 const app = express();
-app.get('/', (req, res) => res.send('✅ SIANO-MD WhatsApp + Telegram Bot is running!'));
+app.get('/', (req, res) =>
+    res.send('✅ SIANO-MD WhatsApp + Telegram Bot running on Render!')
+);
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🌍 Server running on port ${PORT}`));
+app.listen(PORT, () =>
+    console.log(`🌍 Web server running on port ${PORT}`)
+);
