@@ -1,22 +1,29 @@
 {
-  "name": "siano-md-bot",
+  "name": "siano-md",
   "version": "1.0.0",
   "description": "SIANO-MD WhatsApp + Telegram Bot",
-  "main": "src/index.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
-  "author": "Siano",
+  "keywords": [
+    "whatsapp-bot",
+    "telegram-bot",
+    "baileys",
+    "siano-md"
+  ],
+  "author": "Agent Sammie",
   "license": "MIT",
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.18",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "node-telegram-bot-api": "^0.61.0",
-    "pino": "^8.17.0",
-    "qrcode": "^1.5.1"
+    "@whiskeysockets/baileys": "^6.7.7",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "node-telegram-bot-api": "^0.66.0",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
   }
 }
